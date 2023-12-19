@@ -1,11 +1,9 @@
 #!/usr/sbin/perl
 ####################################################################################################################################
-# Script by Aimer G. Diaz (2018)
-# Assited by Clara I Bermudez and Steve Hoffmann 
+# Script by Aimer G. Diaz, Clara Bermudez and Steve Hoffmann 
 # 
 #
 # Run as 
-# perl blockbuster_Gaussian_test.pl  12d4_S7.mapped.ncRNA.bed 12d4_S7.mapped.ncRNA.bam
 # This is the main code non-paralel version of NBlock_tester, try it with your own non-redundant or tag reduced bam files and an 
 # annotation file in bed format, to run in parallel the perl package  Parallel::ForkManager is neded, in that case delete commnetsi
 #
@@ -16,41 +14,36 @@ use warnings;
 use List::Util qw(sum);
 use List::Util qw( reduce );
 use Getopt::Long;
-#use Data::Dumper;
-#use List::MoreUtils qw(uniq);
-#use Parallel::ForkManager;
+use Data::Dumper;
+use List::MoreUtils qw(uniq);
+use Parallel::ForkManager;
 
-#########################################################################################################################
-##---------------------------------------Data Parallelism----------------------------------------------------------------
-##------------------------------To read and save  a heavy file into a  single hash using several cpus per fork  ---------
-#########################################################################################################################
-#uncomment to parallelize 
-#my $forks = shift @ARGV;
-#my $forks = $ARGV[0]; 
+my $forks = shift @ARGV;
+my $forks = $ARGV[0]; 
 #print "$forks and $ARGV[0]\n"; 
 ##---------------------------------------To read and save  a heavy file into a  single hash using several cpus  ----------------------------------
 #by division of read lines 
-#my $line_count = `wc -l  $ARGV[0] | awk '{print \$1}'`;
-#my $parts = ( int($line_count/$forks) + 1) ;  
+my $line_count = `wc -l  $ARGV[0] | awk '{print \$1}'`;
+my $parts = ( int($line_count/$forks) + 1) ;  
 
-#my %result; 
-#my %Bed; 
-#my @sub_hashes;
-#my @q; 
-#my $pm = Parallel::ForkManager->new($forks);
-#$pm->run_on_finish( sub {
-#my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
-#print "** $ident finish with PID $pid and exit code: $exit_code\n";
-#print "** $ident started, pid: $pid\n";
-#print "** $ident finish with PID $pid and exit code: $exit_code\n";
-# my $q =  $data_structure_reference->{input} ;
-#  $Bed{$q} = $data_structure_reference->{output};
-# %Bed = ( %$data_structure_reference , %Bed) ;
-# push @sub_hashes, $data_structure_reference;
-#}
-#);
+my %result; 
+my %Bed; 
+my @sub_hashes;
+my @q; 
+my $pm = Parallel::ForkManager->new($forks);
+$pm->run_on_finish( sub {
+my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
+print "** $ident finish with PID $pid and exit code: $exit_code\n";
+print "** $ident started, pid: $pid\n";
+print "** $ident finish with PID $pid and exit code: $exit_code\n";
+ my $q =  $data_structure_reference->{input} ;
+  $Bed{$q} = $data_structure_reference->{output};
+ %Bed = ( %$data_structure_reference , %Bed) ;
+ push @sub_hashes, $data_structure_reference;
+}
+);
 
-#my $inf_limit = 0; 
+my $inf_limit = 0; 
 #inf=0; for f  in 1681 3200 ; do awk -v lim="$f" -v inf="$inf" '{if (NR > inf && NR < lim) print $0}' LP115-1.R1.ncRNA.bed | wc  ; inf=$f; done 
 #########################################################################################################################
 ##---------------------------------------Data Feed----------------------------------------------------------------------
@@ -63,30 +56,30 @@ my $annotfile  = $ARGV[1];;
 
 $annotfile  =~ s/.*\/(.*).bam/$1/;
 print "\nWorking on ".$annotfile." bam file with non-redundant reads (or read tags) mapped against human genome version hg19. Reads alignment tool used segemehl.\nThe coordinates to check block patterns of expression with small RNA like features is in ".$name." bed file\n\n";
-#my $denv_lib =~  s/.*\/(DENV.*)\/.*/$1/; 
-#print $denv_lib."\n";  
+my $denv_lib =~  s/.*\/(DENV.*)\/.*/$1/; 
+print $denv_lib."\n";  
 my %Bed; 
-#for my $i (1 .. $forks) {
-#my $sup_limit =  $i * $parts;
-#push @coordinates, $inf_limit."_".$sup_limit;
-#$inf_limit = $sup_limit + 1 ;
-#$sup_limit =  $parts / $i;
-#} 
+for my $i (1 .. $forks) {
+my $sup_limit =  $i * $parts;
+push @coordinates, $inf_limit."_".$sup_limit;
+$inf_limit = $sup_limit + 1 ;
+$sup_limit =  $parts / $i;
+} 
 my %new_start ;
 my $wd = "./SmallRNA_patterns_unnanotated/";
 open my $OUT, '>>', $wd.$name.".sm-blocks.bed";
 
 #Parallel:
-#for my $i (1 .. $forks) {
-#my $pid = $pm->start($i) and next Parallel;
-#print "loop $i\n";
-#my @coor =  split /_/,  $coordinates[$i -1];
-#my $inf_limit = $coor[0]  ;
-#my $sup_limit = $coor[1]; 
-#print $inf_limit." vs  $sup_limit\n";
-#open(BED, "awk -v lim_inf=$inf_limit -v lim_sup=$sup_limit '{if (NR > lim_inf && NR < lim_sup ) print }' $ARGV[0] | ");
-open(BED, "$ARGV[0]"); 
-#my out = (); 
+for my $i (1 .. $forks) {
+my $pid = $pm->start($i) and next Parallel;
+print "loop $i\n";
+my @coor =  split /_/,  $coordinates[$i -1];
+my $inf_limit = $coor[0]  ;
+my $sup_limit = $coor[1]; 
+print $inf_limit." vs  $sup_limit\n";
+open(BED, "awk -v lim_inf=$inf_limit -v lim_sup=$sup_limit '{if (NR > lim_inf && NR < lim_sup ) print }' $ARGV[0] | ");
+#open(BED, "$ARGV[0]"); 
+my out = (); 
 	while (<BED>){
 	my $bed = $_;
 	chomp $bed;
