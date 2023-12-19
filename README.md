@@ -94,7 +94,7 @@ sequencing data. Bioinformatics. 2009;25:2298–301.
 
 3\. Gutiérrez Dı́az AA. Detección automatizada de pequeños fragmentos
 derivados de RNAs no-codificantes expresados diferencialmente frente a
-la infección del virus dengue. PhD thesis. 2018.
+la infección del virus dengue. 2018.
 
 </div>
 
