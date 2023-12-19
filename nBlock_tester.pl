@@ -16,28 +16,64 @@ use List::Util qw( reduce );
 use Getopt::Long;
 use Data::Dumper;
 use List::MoreUtils qw(uniq);
+use Parallel::ForkManager;
 
+my $forks = shift @ARGV;
 ##---------------------------------------To read and save  a heavy file into a  single hash using several cpus  ----------------------------------
 #by division of read lines 
-my (%result, %Bed, @sub_hashes, @q, @coordinates); 
+my $line_count = `wc -l  $ARGV[0] | awk '{print \$1}'`;
+my $parts = ( int($line_count/$forks) + 1) ;  
+
+my (%result, %Bed, @sub_hashes, @coordinates); 
+
+my $pm = Parallel::ForkManager->new($forks);
+$pm->run_on_finish( sub {
+my ($pid, $exit_code, $ident, $exit_signal, $q, $core_dump, $data_structure_reference) = @_;
+print "** $ident finish with PID $pid and exit code: $exit_code\n";
+print "** $ident started, pid: $pid\n";
+print "** $ident finish with PID $pid and exit code: $exit_code\n";
+  $q = $data_structure_reference->{input} ; 
+    $Bed{$q } = $data_structure_reference->{output};
+ %Bed = ( %$data_structure_reference , %Bed) ;
+ push @sub_hashes, $data_structure_reference;
+}
+);
+
+my $inf_limit = 0; 
 #########################################################################################################################
 ##---------------------------------------Data Feed----------------------------------------------------------------------
 ##------------------------------Open the coordinates of intergenic or ncRNA expressions---------------------------------
 #########################################################################################################################
 
 my $name = $ARGV[0];
-$name =~ s/.*\/(.*)\.bed/$1/;
-my $annotfile  = $ARGV[1];
+ $name =~ s/.*\/(.*)\.bed/$1/;
+my $annotfile  = $ARGV[1];; 
 
 $annotfile  =~ s/.*\/(.*).bam/$1/;
 print "\nWorking on ".$annotfile." bam file with non-redundant reads (or read tags) mapped against human genome version hg19. Reads alignment tool used segemehl.\nThe coordinates to check block patterns of expression with small RNA like features is in ".$name." bed file\n\n";
 
-my %new_start ;
 my $wd = "./";
-open my $OUT, '>', $wd.$name.".sm-blocks.bed";
+open my $OUT, '>', $wd.$name.".sm-blocks.bed";  
+for my $i (1 .. $forks) {
+my $sup_limit =  $i * $parts;
+push @coordinates, $inf_limit."_".$sup_limit;
+$inf_limit = $sup_limit + 1 ;
+$sup_limit =  $parts / $i;
+} 
+my %new_start ;
 
-open(BED, "$ARGV[0]"); 
 
+
+#Parallel:
+for my $i (1 .. $forks) {
+my $pid = $pm->start($i) and next;
+print "loop $i\n";
+my @coor =  split /_/,  $coordinates[$i -1];
+my $inf_limit = $coor[0]  ;
+my $sup_limit = $coor[1]; 
+print $inf_limit." vs  $sup_limit\n";
+open(BED, "awk -v lim_inf=$inf_limit -v lim_sup=$sup_limit '{if (NR > lim_inf && NR < lim_sup ) print }' $ARGV[0] | ");
+#open(BED, "$ARGV[0]"); 
 	while (<BED>){
 	my $bed = $_;
 	chomp $bed;
@@ -153,7 +189,7 @@ foreach my $keys (sort keys  %single_line ) {
 				if  ( ($final_final-$final_start) <= 16  ) {
  print $OUT "$correction[1]\t".int($real_mean-15)."\t".int($real_mean+15)."\t$feature\t$total_count\t$sense_o\tsl=$start:$end;dl=$block_mean[0]:$block_mean[$#block_mean];sc=$final_start{$final_start};ec=$final_end{$final_final};soc=$S_count;tc=$tag_count;rm=$real_mean;bm=$raw_block_mean;sd=$cute_sd\t".(int($real_mean+15)-int($real_mean-15))."\n";
 				}  else {
-print $OUT "$correction[1]\t$final_start\t$final_final\t$feature\t$total_count\t$sense_o\tsl=$start:$end;dl=$block_mean[0]:$block_mean[$#block_mean];sc=$final_start{$final_start};ec=$final_end{$final_final};soc=$S_count;tc=$tag_count;rm=$real_mean;bm=$raw_block_mean;sd=$cute_sd\t".($final_final-$final_start)."\n";  
+print $OUT "$correction[1]\t$final_start\t$final_final\t$feature\t$total_count\t$sense_o\tsl=$start:$end;dl=$block_mean[0]:$block_mean[$#block_mean];sc=$final_start{$final_start};ec=$final_end{$final_final};soc=$S_count;tc=$tag_count;rm=$real_mean;bm=$raw_block_mean;sd=$cute_sd\t".($final_final-$final_start)."\n";
 				        } 
 							} #close if heigth filter 
 			$total_count = 0; #re-start the counter
@@ -173,9 +209,11 @@ print $OUT "$correction[1]\t$final_start\t$final_final\t$feature\t$total_count\t
 		} #close if for test if is the first occurrence 
 } #close foreach explotarion of the bed file 
 } #CLOSE INITIAL BED
+$pm->finish($i);
 
+} #  Close FORK loop
+$pm->wait_all_children;
 
-## 
 ##------------------------ Subroutines --------------
 ##
 sub mean {
@@ -212,3 +250,4 @@ sub median
         return ($vals[int($len/2)-1] + $vals[int($len/2)])/2;
     }
 }
+
