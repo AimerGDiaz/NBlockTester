@@ -51,6 +51,11 @@ Test installation by running
 
     perl -e 'use Parallel::ForkManager;'
 
+To run parallel version of the code just assing the number of threads to
+be use:
+
+    perl nBlock_tester.pl  2  test_data/Transcribed-non-protein-genes_regions/ncRNA-or-intergenic_regions.bed  test_data/Mapped_tag_reduced_data/12d4_S7.mapped.ncRNA.bam
+
 ## License
 
 The code is freely available to download and run, but it’s protected and
